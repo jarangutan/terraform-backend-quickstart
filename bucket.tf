@@ -1,3 +1,7 @@
+locals {
+  define_lifecyle_rule = var.noncurrent_version_expiration != null
+}
+
 #### KMS Key
 resource "aws_kms_key" "state_key" {
   description             = "s3 state encrypt key"
@@ -7,12 +11,25 @@ resource "aws_kms_key" "state_key" {
 
 #### S3 bucket
 resource "aws_s3_bucket" "state" {
-  bucket_prefix = var.prefix
+  bucket        = "${var.prefix}-terraform-state"
   acl           = "private"
   force_destroy = true
 
   versioning {
     enabled = true
+  }
+
+  dynamic "lifecycle_rule" {
+    for_each = local.define_lifecyle_rule ? [true] : []
+    content {
+      enabled = true
+      dynamic "noncurrent_version_expiration" {
+        for_each = var.noncurrent_version_expiration != null ? [var.noncurrent_version_expiration] : []
+        content {
+          days = noncurrent_version_expiration.value.days
+        }
+      }
+    }
   }
 
   server_side_encryption_configuration {
